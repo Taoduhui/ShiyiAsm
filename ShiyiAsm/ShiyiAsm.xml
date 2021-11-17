@@ -1,0 +1,32 @@
+<FuckDotdot>
+  <AliasSettings>
+  </AliasSettings>
+  <TargetFileTypes>
+    <FileType type="*.js">
+      <Alias key="@ShiyiFramework">miniprogram/ShiyiFramework</Alias>
+      <Alias key="@Npm">miniprogram/miniprogram_npm</Alias>
+      <Alias key="@Page">miniprogram/pages</Alias>
+      <Alias key="@Root">miniprogram</Alias>
+      <Alias key="@Api">miniprogram/Api</Alias>
+      <Alias key="@Components">miniprogram/components</Alias>
+      <Alias key="@GlobalData">miniprogram/GlobalData</Alias>
+    </FileType>
+    <FileType type="*.src.json" to="*.json" >
+      <Alias key="@Npm">miniprogram/miniprogram_npm</Alias>
+      <Alias key="@Components">miniprogram/components</Alias>
+    </FileType>
+    <FileType type="*.css" to="*.wxss" >
+      <Alias key="@ShiyiFramework">miniprogram/ShiyiFramework</Alias>
+      <Alias key="@Root">miniprogram</Alias>
+    </FileType>
+    <FileType type="*.saml" to="*.wxml" >
+      <Asm key="{{Home}}">./Asm/{{Key}}.saml</Asm>
+    </FileType>
+  </TargetFileTypes>
+  <ExcludeSetting>
+    <Exclude>miniprogram/miniprogram_npm</Exclude>
+  </ExcludeSetting>
+  <Command>
+    <BeforeCmd>tsc</BeforeCmd>
+  </Command>
+</FuckDotdot>
