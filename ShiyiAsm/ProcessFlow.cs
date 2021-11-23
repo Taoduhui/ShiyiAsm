@@ -176,7 +176,8 @@ namespace ShiyiAsm
             }
             string RootLabel = "Root" + Guid.NewGuid().ToString();
             code = String.Format("<{0}>{1}</{2}>", RootLabel, code, RootLabel);
-            code = code.Replace("bind:", "bind");
+            code = code.Replace("bind:", "bind-");
+            code = code.Replace("wx:", "wx-");
             XmlDocument SrcCodeXml = new XmlDocument();
             try
             {
@@ -258,13 +259,15 @@ namespace ShiyiAsm
                                 CompCode = Process(CompCode, ComFile);
                             }
                             CompCode = CompCode.Replace("Com:", ComponentId);
-                            Regex ComFuncRegex = new Regex("{{Func:[A-Za-z0-9_]+}}");
+                            Regex ComFuncRegex = new Regex("\\{\\{[\\s]*Func:[A-Za-z0-9_]+[\\s]*\\}\\}");
                             MatchCollection Funcs = ComFuncRegex.Matches(CompCode);
                             foreach (Match match in Funcs)
                             {
-                                string func = match.Value.Replace("{{Func:", ComponentId).Replace("}}", "");
+                                string func = match.Value.Replace(match.Value.Remove(match.Value.IndexOf(":") + 1), ComponentId).Replace("}}", "").Replace(" ", "");
                                 CompCode = CompCode.Replace(match.Value, func);
                             }
+                            CompCode = CompCode.Replace("bind:", "bind-");
+                            CompCode = CompCode.Replace("wx:", "wx-");
                             XmlElement CompElement = SrcCodeXml.CreateElement("view");
                             foreach (XmlAttribute attribute in Component.Attributes)
                             {
@@ -310,6 +313,8 @@ namespace ShiyiAsm
             }
             code = SrcCodeXml.OuterXml;
             code = code.Replace("<" + RootLabel + ">", "").Replace("</" + RootLabel + ">", "");
+            code = code.Replace("bind-", "bind:");
+            code = code.Replace("wx-", "wx:");
             if (IsRoot)
             {
                 ApplyToPreProcess();
