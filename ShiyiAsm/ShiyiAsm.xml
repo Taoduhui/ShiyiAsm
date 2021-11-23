@@ -11,7 +11,7 @@
       <Alias key="@Components">miniprogram/components</Alias>
       <Alias key="@GlobalData">miniprogram/GlobalData</Alias>
     </FileType>
-    <FileType type="*.src.json" to="*.json" >
+    <FileType type="*.sajson" to="*.json" >
       <Alias key="@Npm">miniprogram/miniprogram_npm</Alias>
       <Alias key="@Components">miniprogram/components</Alias>
     </FileType>
@@ -19,13 +19,13 @@
       <Alias key="@ShiyiFramework">miniprogram/ShiyiFramework</Alias>
       <Alias key="@Root">miniprogram</Alias>
     </FileType>
-    <FileType type="*.saml" to="*.wxml" >
-      <Asm key="{{Home}}">./Asm/{{Key}}.saml</Asm>
-    </FileType>
+    <FileType type="*.saml" to="*.wxml"/>
+    <FileType type="*.sacss" to="*.wxss"/>
   </TargetFileTypes>
   <ExcludeSetting>
     <Exclude>miniprogram/miniprogram_npm</Exclude>
   </ExcludeSetting>
+  <EnableComponents>true</EnableComponents>
   <Command>
     <BeforeCmd>tsc</BeforeCmd>
   </Command>

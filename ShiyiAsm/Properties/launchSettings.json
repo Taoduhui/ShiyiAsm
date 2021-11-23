@@ -2,7 +2,7 @@
   "profiles": {
     "ShiyiAsm": {
       "commandName": "Project",
-      "commandLineArgs": "--w=50"
+      "commandLineArgs": "-page TestPage --overwrite"
     }
   }
 }

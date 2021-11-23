@@ -9,7 +9,7 @@ namespace ShiyiAsm
 {
     class SystemUtils
     {
-        public static void RunCmd(string str)
+        public static string RunCmd(string str)
         {
             System.Diagnostics.Process p = new System.Diagnostics.Process();
             p.StartInfo.FileName = Directory.GetCurrentDirectory();
@@ -46,7 +46,8 @@ namespace ShiyiAsm
             p.Close();
 
 
-            Console.WriteLine(output);
+            //Console.WriteLine(output);
+            return output;
         }
     }
 }

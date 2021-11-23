@@ -9,16 +9,55 @@ namespace ShiyiAsm
 {
     class FileHelper
     {
-        public static List<string> GetAllTargetFiles(string FileType, List<string> Exclude)
+        static List<string> CompExtentions = new List<string>() { ".caml", ".cacss", "cajson" };
+
+        public static void NameReplace(string src, string target, string path)
+        {
+            string[] files = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories);
+            foreach (string filepath in files)
+            {
+                FileInfo fileInfo = new FileInfo(filepath);
+                string targetName = fileInfo.Name.Replace(fileInfo.Extension, "").Replace(src, target) + fileInfo.Extension;
+                File.Move(fileInfo.FullName, fileInfo.DirectoryName + "/" + targetName, true);
+            }
+        }
+        public static List<string> GetAllTargetFiles(string FileType, List<string> Exclude, List<string> FileRange)
         {
             List<string> TargetFiles = new List<string>();
-            string[] res = Directory.GetFiles(Directory.GetCurrentDirectory(), FileType, SearchOption.AllDirectories);
+            string[] res = new string[] { };
+            if (FileRange.Count == 0)
+            {
+                res = Directory.GetFiles(Directory.GetCurrentDirectory(), FileType, SearchOption.AllDirectories);
+            }
+            else
+            {
+                List<string> ResList = new List<string>();
+                foreach (string path in FileRange)
+                {
+                    if (FileType == "*.js")
+                    {
+                        ResList = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.js", SearchOption.AllDirectories).ToList();
+                        break;
+                    }
+                    if (FileType == "*.saml" && CompExtentions.Contains(new FileInfo(path).Extension))
+                    {
+                        ResList = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.saml", SearchOption.AllDirectories).ToList();
+                        break;
+                    }
+                    if (new FileInfo(path).Extension == FileType.Replace("*", ""))
+                    {
+                        ResList.Add(path);
+                    }
+                }
+                res = ResList.ToArray();
+            }
+
             foreach (string path in res)
             {
                 bool skip = false;
                 foreach (string exc in Exclude)
                 {
-                    if (path.Contains(exc))
+                    if (path.Contains(exc.Replace("/", "\\")))
                     {
                         skip = true;
                         break;

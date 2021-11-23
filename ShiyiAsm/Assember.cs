@@ -10,59 +10,99 @@ namespace ShiyiAsm
 {
     class Assember
     {
+        public static ProcessFlow CurrentProcessFlow;
+
         public static void Start()
         {
-            int Cnt = 0;
-            Configuration.LoadConfiguration();
-            Console.WriteLine("Run Before Command:");
-            foreach (string cmd in Configuration.BeforeCmd)
+            Start(new List<string>());
+        }
+        public static void Start(List<string> FileRange)
+        {
+            Configuration.LoadConfiguration(FileRange);
+            string BeforeOutput = RunBeforeCmd();
+            int Cnt = RunFlow();
+            while (CodeSetting.PreProcessCode.Count > 0)
             {
-                Console.WriteLine("\t{0}", cmd);
-                SystemUtils.RunCmd(cmd);
+                Configuration.LoadConfiguration(CodeSetting.PreProcessCode.Keys.ToList());
+                RunFlow();
             }
-            Console.WriteLine("");
+            Console.WriteLine("{0} Files Affected\n", Cnt);
+            string AfterOutput = RunAfterCmd();
+            Console.WriteLine(BeforeOutput);
+            Console.WriteLine(AfterOutput);
+            Console.WriteLine("Completed");
+        }
+
+        private static string RunAfterCmd()
+        {
+            string Output = "RunAfterCmd\n";
+            foreach (string cmd in Configuration.AfterCmd)
+            {
+                Output += string.Format("\t{0}\n", cmd);
+                Output += SystemUtils.RunCmd(cmd);
+            }
+            return Output;
+        }
+
+        private static int RunFlow()
+        {
+            int Cnt = 0;
             foreach (KeyValuePair<string, CodeSetting> pair in Configuration.CodeSettings)
             {
                 foreach (string filepath in pair.Value.MatchedFiles)
                 {
-                    CodeSetting codeSetting = pair.Value;
-                    ProcessFlow flow = new ProcessFlow(filepath);
-                    string code = flow
-                        .Process(codeSetting.AsmSetting)
-                        .Process(codeSetting.PathMappingSetting)
-                        .GetResult();
-                    string Output = filepath;
-                    FileInfo fileInfo = new FileInfo(filepath);
-                    if (codeSetting.Rename != null && codeSetting.Rename != "")
-                    {
-                        Output = fileInfo.FullName.Replace(fileInfo.Extension, codeSetting.Rename.Replace("*", ""));
-                    }
-                    if (codeSetting.AsmSetting.IsChanged || codeSetting.PathMappingSetting.IsChanged)
-                    {
-                        if (File.Exists(Output))
-                        {
-                            File.Delete(Output);
-                        }
-                        using (Stream s = File.OpenWrite(Output))
-                        {
-                            using (StreamWriter sw = new StreamWriter(s))
-                            {
-                                sw.Write(code);
-                            }
-                        }
-                        Cnt++;
-                        Console.WriteLine(new FileInfo(Output).Name + " Generated");
-                    }
+                    Cnt += Process(pair.Value, filepath);
                 }
             }
-            Console.WriteLine("{0} Files Affected\n", Cnt);
-            Console.WriteLine("Run After Command:");
-            foreach (string cmd in Configuration.AfterCmd)
+            return Cnt;
+        }
+
+        private static int Process(CodeSetting _codeSetting, string filepath)
+        {
+            int Cnt = 0;
+            CodeSetting codeSetting = _codeSetting;
+            FileInfo fileInfo = new FileInfo(filepath);
+            string Output = filepath;
+            if (codeSetting.Rename != null && codeSetting.Rename != "")
             {
-                Console.WriteLine("\t{0}", cmd);
-                SystemUtils.RunCmd(cmd);
+                Output = fileInfo.FullName.Replace(fileInfo.Extension, codeSetting.Rename.Replace("*", ""));
             }
-            Console.WriteLine("Completed");
+
+            CurrentProcessFlow = new ProcessFlow(filepath, Output, codeSetting);
+            for (int i = 0; i < codeSetting.ProcessFlows.Count; i++)
+            {
+                CurrentProcessFlow = CurrentProcessFlow.Process(codeSetting.ProcessFlows[i]);
+            }
+            string code = CurrentProcessFlow.GetResult();
+
+            if (codeSetting.IsChanged() || CurrentProcessFlow.PreProcessed)
+            {
+                Cnt++;
+                Console.WriteLine(new FileInfo(Output).Name + " Affected");
+            }
+            if (File.Exists(Output))
+            {
+                File.Delete(Output);
+            }
+            using (Stream s = File.OpenWrite(Output))
+            {
+                using (StreamWriter sw = new StreamWriter(s))
+                {
+                    sw.Write(code);
+                }
+            }
+            return Cnt;
+        }
+
+        private static string RunBeforeCmd()
+        {
+            string Output = "RunBeforeCmd\n";
+            foreach (string cmd in Configuration.BeforeCmd)
+            {
+                Output += string.Format("\t{0}\n", cmd);
+                Output += SystemUtils.RunCmd(cmd);
+            }
+            return Output;
         }
 
         static FileSystemWatcher watcher = new FileSystemWatcher(Directory.GetCurrentDirectory());
@@ -120,7 +160,7 @@ namespace ShiyiAsm
 
         }
 
-        private static void Watcher_Notification(object sender, object e)
+        private static void Watcher_Notification(object sender, FileSystemEventArgs e)
         {
             if (!delay()) { return; }
             Console.Clear();
