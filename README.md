@@ -2,15 +2,17 @@
 
 用于解决微信小程序typescript无法绝对路径引用的问题。
 
+提供ShiyiFramework的typescript伪组件支持
+
 原理：
 
 ​	替换字符串，所以请注意alias的key不要和代码重复，否则会被替换，可以使在前加特殊符号的方式表示
 
 使用方法：
 
-1. 将ShiyiAsm解压至tsconfig.json同级目录下
+1. 将ShiyiAsm解压至任意目录下，并配置环境变量path
 
-2. 配置ShiyiAsm.xml
+2. 于tsconfig.json同级目录下创建ShiyiAsm.xml，按照如下配置
 
    ```xml
    <FuckDotdot>
@@ -19,10 +21,10 @@
      </AliasSettings>
      <TargetFileTypes>
        <FileType type="*.js"></FileType>
-       <FileType type="*.json">	
+       <FileType type="*.sajson" to="*.json">	
          <Alias key="@Npm">miniprogram/miniprogram_npm</Alias>
        </FileType>
-       <FileType type="*.src.wxss" to="*.wxss">	<!-- to属性定义输出后修改的扩展名 -->
+       <FileType type="*.sacss" to="*.wxss">	<!-- to属性定义输出后修改的扩展名 -->
          <Alias key="@Npm">miniprogram/miniprogram_npm</Alias> <!-- Alias标签定义目录别名 -->
        </FileType>
        <FileType type="*.saml" to="*.wxml"></FileType>
@@ -31,9 +33,10 @@
        <Exclude>miniprogram/miniprogram_npm</Exclude>	<!-- Exclude标签定义需要跳过的目录 -->
        <Exclude>node_modules</Exclude>
      </ExcludeSetting>
+     <EnableComponents>true</EnableComponents> <!-- 是否启用伪组件编译 -->
      <Command>
-       <BeforeCmd>tsc</BeforeCmd>  <!-- BeforeCmd标签定义在替换程序执行前运行的命令，可多个 -->
-       <AfterCmd>echo completed</AfterCmd>  <!-- AfterCmd标签定义在替换程序执行后运行的命令，可多个 -->
+       <BeforeCmd>tsc</BeforeCmd>  <!-- BeforeCmd标签定义在替换程序执行前运行的命令，多个标签代表多条命令 -->
+       <AfterCmd>echo completed</AfterCmd>  <!-- AfterCmd标签定义在替换程序执行后运行的命令，多个标签代表多条命令 -->
      </Command>
    </FuckDotdot>
    ```
@@ -127,16 +130,23 @@
 6. 将微信开发者工具的 详情 --> 本地设置 --> 自定义处理命令替换成以下命令
 
    ```
-    npm run tsc && ShiyiAsm.exe //若ShiyiAsm.xml中配置了BeforeCmd为tsc，可不加npm run tsc &&
+    npm run tsc && ShiyiAsm -r //若ShiyiAsm.xml中配置了BeforeCmd为tsc，可不加npm run tsc &&
    ```
 
 7. 开始编译
 
-8. 参数 **--w=[sec]**自动检测更改 ，sec为可选参数，用于设定在检测到变更后sec毫秒内无变更执行替换操作
+8. 运行参数
 
    ```
-   ./ShiyiAsm.exe --w=200
+   参数    附加    描述
+   -comp   2       创建伪组件: -comp [组件名] --overwrite/--skip
+   -page   2       创建ShiyiPage: -page [页面名] --overwrite/--skip      
+   -i      0       初始化vscode配置
+   -r      0       运行
+   -w      0       自动监听文件更改
    ```
-
+   
+   
+   
    
 
