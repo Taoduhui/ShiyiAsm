@@ -52,6 +52,26 @@ namespace ShiyiAsm
                 }
                 Console.WriteLine("{0} ShiyiPage Created", para[0]);
             }, "创建ShiyiPage: -page [页面名] --overwrite/--skip", 2);
+            commandLine.AddHandler("-api", (para) =>
+            {
+                using (MemoryStream s = new MemoryStream(Templete.ResourceManager.GetObject("ApiTemplete") as byte[]))
+                {
+                    using (ZipArchive zipArchive = new ZipArchive(s, ZipArchiveMode.Read))
+                    {
+                        try
+                        {
+                            zipArchive.ExtractToDirectory("./", para[1] == "--overwrite"); ;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(ex.Message);
+                        }
+                        TempleteCreator.ReplaceKeyword("./", para[0]);
+                        FileHelper.NameReplace("Templete", para[0], "./");
+                    }
+                }
+                Console.WriteLine("{0} ShiyiPage Created", para[0]);
+            }, "创建ShiyiApi: -api [Api名] --overwrite/--skip", 2);
             commandLine.AddHandler("-i", (para) =>
             {
                 if (!File.Exists("./.vscode/settings.json"))
