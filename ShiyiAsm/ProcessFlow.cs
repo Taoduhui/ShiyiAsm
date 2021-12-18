@@ -92,7 +92,7 @@ namespace ShiyiAsm
     class AsmSetting : ProcessFlowSetting
     {
         protected Dictionary<string, string> Mapping = new Dictionary<string, string>();
-
+        List<string> SamlFiles;
         public AsmSetting()
         {
             string[] SamlFiles = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.saml", SearchOption.AllDirectories);
@@ -165,7 +165,15 @@ namespace ShiyiAsm
             foreach (string file in SamlFiles)
             {
                 FileInfo fileinfo = new FileInfo(file);
-                Mapping.Add(fileinfo.Name.Replace(fileinfo.Extension, ""), file);
+                string name = fileinfo.Name.Replace(fileinfo.Extension, "");
+                if (Mapping.ContainsKey(name))
+                {
+                    SystemUtils.WriteError(string.Format("{0} \n and \n {1} \n has same file name, {1} will be ignored", Mapping[name], file));
+                }
+                else
+                {
+                    Mapping.Add(fileinfo.Name.Replace(fileinfo.Extension, ""), file);
+                }
             }
         }
 
@@ -182,8 +190,8 @@ namespace ShiyiAsm
                 Moustache = Moustache.Replace("Com:", ComponentId);
                 if (Moustache.Contains("Func:"))
                 {
-                    Moustache= Moustache.Replace("Func:", ComponentId);
-                    Moustache=Moustache.Replace("{{", "").Replace("}}", "");
+                    Moustache = Moustache.Replace("Func:", ComponentId);
+                    Moustache = Moustache.Replace("{{", "").Replace("}}", "");
                 }
                 Moustaches.Add(guid, Moustache);
             }
@@ -218,6 +226,7 @@ namespace ShiyiAsm
         {
             HtmlDocument SrcCodeXml = new HtmlDocument();
             SrcCodeXml.LoadHtml(code);
+            code = SrcCodeXml.DocumentNode.OuterHtml;
             List<string> Replaced = new List<string>();
 
             HtmlNodeCollection inputs = SrcCodeXml.DocumentNode.SelectNodes("//input");
@@ -230,6 +239,7 @@ namespace ShiyiAsm
                     Replaced.Add(node.OuterHtml);
                 }
             }
+
 
             return code;
         }
@@ -251,10 +261,7 @@ namespace ShiyiAsm
             }
             catch (Exception ex)
             {
-
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Error:\"{0}\" in {1}", ex.Message, filepath);
-                Console.ForegroundColor = ConsoleColor.White;
+                SystemUtils.WriteError(string.Format("Error:\"{0}\" in {1}", ex.Message, filepath));
                 return CodeBuckup;
             }
 
@@ -377,15 +384,53 @@ namespace ShiyiAsm
                     }
                 }
             }
+
             code = SrcCodeXml.DocumentNode.OuterHtml;
-            code = SpecialCharRecovery(code);
             code = RecoveryMoustache(code);
+            code = BindTwoWay(filepath, code);
+            code = SpecialCharRecovery(code);
             if (IsRoot)
             {
                 ApplyToPreProcess();
                 CurrentCompnent = new PesudoCompnent();
             }
             return code;
+        }
+
+        private string BindTwoWay(string filepath, string code)
+        {
+            HtmlDocument SrcCodeXml = new HtmlDocument();
+            SrcCodeXml.LoadHtml(code);
+            HtmlNodeCollection BindTwoWayNodes = SrcCodeXml.DocumentNode.SelectNodes("//input[@bindtwoway]");
+            ProcessBindTwoWayNodes(filepath, SrcCodeXml, BindTwoWayNodes, "value", "bind:input");
+            BindTwoWayNodes = SrcCodeXml.DocumentNode.SelectNodes("//picker[@bindtwoway]");
+            ProcessBindTwoWayNodes(filepath, SrcCodeXml, BindTwoWayNodes, "value", "bind:change");
+            BindTwoWayNodes = SrcCodeXml.DocumentNode.SelectNodes("//radio-group[@bindtwoway]");
+            ProcessBindTwoWayNodes(filepath, SrcCodeXml, BindTwoWayNodes, "value", "bind:change");
+            return SrcCodeXml.DocumentNode.OuterHtml.Replace("bindtwoway=\"\"", ""); ;
+        }
+
+        private static void ProcessBindTwoWayNodes(
+            string filepath,
+            HtmlDocument SrcCodeXml,
+            HtmlNodeCollection BindTwoWayNodes, string srcKey, string eventName)
+        {
+            if (BindTwoWayNodes != null)
+            {
+                foreach (HtmlNode BindTwoWayNode in BindTwoWayNodes)
+                {
+                    if (BindTwoWayNode.Attributes["value"] == null)
+                    {
+                        SystemUtils.WriteError(string.Format("Error:\"{0}\" in {1}", "BindTwoWay need value", filepath));
+                        continue;
+                    }
+                    string value = BindTwoWayNode.Attributes[srcKey].Value;
+                    string path = value.Replace("{{", "").Replace("}}", "");
+                    BindTwoWayNode.SetAttributeValue(eventName, "DataChange");
+                    BindTwoWayNode.SetAttributeValue("data-key", path);
+                }
+            }
+
         }
 
         private static void ApplyToPreProcess()

@@ -11,13 +11,16 @@ namespace ShiyiAsm
     class Assember
     {
         public static ProcessFlow CurrentProcessFlow;
-
+        public static bool IsCompiling = false;
+        public static bool TscIsCompiling = false;
+        public static string ResultMsg = "";
         public static void Start()
         {
             Start(new List<string>());
         }
         public static void Start(List<string> FileRange)
         {
+            IsCompiling = true;
             Configuration.LoadConfiguration(FileRange);
             string BeforeOutput = RunBeforeCmd();
             int Cnt = RunFlow();
@@ -30,7 +33,10 @@ namespace ShiyiAsm
             string AfterOutput = RunAfterCmd();
             Console.WriteLine(BeforeOutput);
             Console.WriteLine(AfterOutput);
+            Console.WriteLine(ResultMsg.Replace("\u001bc", ""));
+            ResultMsg = "";
             Console.WriteLine("Completed");
+            IsCompiling = false;
         }
 
         private static string RunAfterCmd()
@@ -94,6 +100,26 @@ namespace ShiyiAsm
             return Cnt;
         }
 
+        public static void WatchTsc()
+        {
+            Watch(100, false, false);
+            SystemUtils.RunCmdAsync("tsc -w", (data) =>
+            {
+                if (data.Contains("Starting compilation in watch mode") || data.Contains("Starting incremental compilation"))
+                {
+                    watcher.EnableRaisingEvents = false;
+                    TscIsCompiling = true;
+                }
+                ResultMsg += data + "\n";
+                if (data.Contains("Watching for file changes") && !IsCompiling)
+                {
+                    TscIsCompiling = false;
+                    Start();
+                    watcher.EnableRaisingEvents = true;
+                }
+            });
+        }
+
         private static string RunBeforeCmd()
         {
             string Output = "RunBeforeCmd\n";
@@ -107,9 +133,12 @@ namespace ShiyiAsm
 
         static FileSystemWatcher watcher = new FileSystemWatcher(Directory.GetCurrentDirectory());
         static int DelayParm = 0;
-        public static void Watch(int time)
+        public static void Watch(int time, bool DoFirst = true, bool waiting = true)
         {
-            Start();
+            if (DoFirst)
+            {
+                Start();
+            }
             if (time >= 0)
             {
                 DelayParm = time;
@@ -121,7 +150,11 @@ namespace ShiyiAsm
             DelayTime = DelayParm;
             Console.WriteLine("Start watching...");
             InitWatcher();
-            while (true) { Console.ReadKey(); }
+            if (waiting)
+            {
+                while (true) { Console.ReadKey(); }
+            }
+
         }
 
 
@@ -140,6 +173,10 @@ namespace ShiyiAsm
         static int DelayTime = 20;
         private static bool delay()
         {
+            if (TscIsCompiling || IsCompiling)
+            {
+                return false;
+            }
             if (DelayTime != DelayParm)
             {
                 DelayTime = DelayParm - 1;
@@ -162,8 +199,34 @@ namespace ShiyiAsm
 
         private static void Watcher_Notification(object sender, FileSystemEventArgs e)
         {
+            if (e.ChangeType == WatcherChangeTypes.Created)
+            {
+                FileHelper.AllDir.Add(e.FullPath);
+            }
+            else if (e.ChangeType == WatcherChangeTypes.Deleted)
+            {
+                int DirIndex = FileHelper.AllDir.IndexOf(e.FullPath);
+                if (DirIndex >= 0)
+                {
+                    FileHelper.AllDir.RemoveAt(DirIndex);
+                }
+            }
+            else if (e.ChangeType == WatcherChangeTypes.Renamed)
+            {
+                int DirIndex = FileHelper.AllDir.IndexOf(e.FullPath);
+                if (DirIndex >= 0)
+                {
+                    FileHelper.AllDir.RemoveAt(DirIndex);
+                }
+                FileHelper.AllDir.Add(e.FullPath);
+            }
+
             if (!delay()) { return; }
             Console.Clear();
+            if (!watcher.EnableRaisingEvents)
+            {
+                return;
+            }
             watcher.EnableRaisingEvents = false;
             Console.WriteLine("Detect Change");
             int err = 0;

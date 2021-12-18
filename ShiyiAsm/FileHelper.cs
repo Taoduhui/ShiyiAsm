@@ -9,7 +9,13 @@ namespace ShiyiAsm
 {
     class FileHelper
     {
+        public static List<string> AllDir = new List<string>();
         static List<string> CompExtentions = new List<string>() { ".caml", ".cacss", "cajson" };
+
+        public static void UpdateDir()
+        {
+            AllDir = new List<string>(Directory.GetFiles(Directory.GetCurrentDirectory(), "*.*", SearchOption.AllDirectories));
+        }
 
         public static void NameReplace(string src, string target, string path)
         {

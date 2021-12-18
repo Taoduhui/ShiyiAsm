@@ -11,6 +11,7 @@ namespace ShiyiAsm
     {
         static void Main(string[] args)
         {
+            FileHelper.UpdateDir();
             CommandLine commandLine = new CommandLine(args);
             commandLine.AddHandler("-comp", (para) =>
             {
@@ -51,7 +52,7 @@ namespace ShiyiAsm
                     }
                 }
                 Console.WriteLine("{0} ShiyiPage Created", para[0]);
-            }, "创建ShiyiPage: -page [页面名] --overwrite/--skip", 2);
+            }, "创建ShiyiPage: -page [页面名] --overwrite/--skip",2);
             commandLine.AddHandler("-api", (para) =>
             {
                 using (MemoryStream s = new MemoryStream(Templete.ResourceManager.GetObject("ApiTemplete") as byte[]))
@@ -146,7 +147,10 @@ namespace ShiyiAsm
             {
                 Assember.Watch(-1);
             }, "自动监听文件更改", 0);
-
+            commandLine.AddHandler("-wtsc", (para) =>
+            {
+                Assember.WatchTsc();
+            }, "使用tsc监听文件更改", 0);
             commandLine.Run();
         }
 
