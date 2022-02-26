@@ -107,6 +107,7 @@ namespace ShiyiAsm
             {
                 if (data.Contains("Starting compilation in watch mode") || data.Contains("Starting incremental compilation"))
                 {
+                    Console.Clear();
                     watcher.EnableRaisingEvents = false;
                     TscIsCompiling = true;
                 }
@@ -145,7 +146,7 @@ namespace ShiyiAsm
             }
             else
             {
-                DelayParm = 100;
+                DelayParm = 500;
             }
             DelayTime = DelayParm;
             Console.WriteLine("Start watching...");

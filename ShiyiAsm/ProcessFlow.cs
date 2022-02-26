@@ -228,7 +228,6 @@ namespace ShiyiAsm
             SrcCodeXml.LoadHtml(code);
             code = SrcCodeXml.DocumentNode.OuterHtml;
             List<string> Replaced = new List<string>();
-
             HtmlNodeCollection inputs = SrcCodeXml.DocumentNode.SelectNodes("//input");
             if (inputs != null)
             {
@@ -244,6 +243,7 @@ namespace ShiyiAsm
             return code;
         }
 
+        private string CurrentCompId = "";
         public override string Process(string code, string filepath)
         {
             IsChanged = false;
@@ -254,7 +254,7 @@ namespace ShiyiAsm
             HtmlDocument SrcCodeXml = new HtmlDocument();
             string CodeBuckup = code;
             code = SpecialCharProtect(code);
-            code = ProtectMoustache(code, "");
+            code = ProtectMoustache(code, CurrentCompId);
             try
             {
                 SrcCodeXml.LoadHtml(code);
@@ -275,6 +275,8 @@ namespace ShiyiAsm
                     string KeyLabel = Component.OuterHtml;
                     string ComponentName = Component.Attributes["using"].Value;
                     string ComponentId = Component.Attributes["id"].Value;
+
+                    AddComponentRenderSwich(Component, ComponentId);
                     if (ExistComponents.Contains(ComponentName))
                     {
                         IsChanged = true;
@@ -290,97 +292,16 @@ namespace ShiyiAsm
                             CurrentCompnent.IsInited = true;
                             IsRoot = true;
                             CurrentCompnent.Caml = code;
-                            string SrcFilePath = Assember.CurrentProcessFlow.SrcFilePath;
-                            FileInfo SrcFileInfo = new FileInfo(SrcFilePath);
-                            string SrcBasePath = SrcFilePath.Replace(SrcFileInfo.Extension, ".");
-                            CurrentCompnent.SrcSamlPath = SrcBasePath + "saml";
-                            CurrentCompnent.SrcSajsonPath = SrcBasePath + "sajson";
-                            CurrentCompnent.SrcSacssPath = SrcBasePath + "sacss";
-                            if (File.Exists(SrcBasePath + "sajson"))
-                            {
-                                using (Stream s = File.OpenRead(SrcBasePath + "sajson"))
-                                {
-                                    using (StreamReader sr = new StreamReader(s))
-                                    {
-                                        CurrentCompnent.CombineSaJson(sr.ReadToEnd());
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                Console.WriteLine("Compnent Incomplete!");
-                            }
-                            if (File.Exists(SrcBasePath + "sacss"))
-                            {
-                                using (Stream s = File.OpenRead(SrcBasePath + "sacss"))
-                                {
-                                    using (StreamReader sr = new StreamReader(s))
-                                    {
-                                        CurrentCompnent.Sacss += "\n\r" + sr.ReadToEnd();
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                Console.WriteLine("Compnent Incomplete!");
-                            }
+                            string SrcBasePath = GetSrcBasePath();
+                            ReadComponentJsonAndCss(SrcBasePath);
                         }
+
+
 
                         #region 注入wxml
-
-                        using (Stream s = File.OpenRead(ComFile))
-                        {
-                            using (StreamReader sr = new StreamReader(s))
-                            {
-                                string CompCode = sr.ReadToEnd();
-                                if (CompCode.Replace(" ", "").Contains("<Component"))
-                                {
-                                    CompCode = Process(CompCode, ComFile);
-                                }
-
-                                CompCode = SpecialCharProtect(CompCode);
-                                CompCode = ProtectMoustache(CompCode, ComponentId);
-                                HtmlNode CompElement = SrcCodeXml.CreateElement("view");
-                                foreach (HtmlAttribute attribute in Component.Attributes)
-                                {
-                                    CompElement.SetAttributeValue(attribute.Name, attribute.Value);
-                                }
-                                CompElement.Attributes.Remove(CompElement.Attributes["using"]);
-                                CompElement.Attributes.Remove(CompElement.Attributes["id"]);
-                                CompElement.InnerHtml = CompCode;
-                                Component.ParentNode.ReplaceChild(CompElement, Component);
-                            }
-                        }
+                        InsertWxml(SrcCodeXml, Component, ComponentId, ComFile);
                         #endregion
-
-                        if (File.Exists(SrcComBasePath + "cajson"))
-                        {
-                            using (Stream s = File.OpenRead(SrcComBasePath + "cajson"))
-                            {
-                                using (StreamReader sr = new StreamReader(s))
-                                {
-                                    CurrentCompnent.CombineSaJson(sr.ReadToEnd());
-                                }
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine("Compnent Incomplete!");
-                        }
-                        if (File.Exists(SrcComBasePath + "cacss"))
-                        {
-                            using (Stream s = File.OpenRead(SrcComBasePath + "cacss"))
-                            {
-                                using (StreamReader sr = new StreamReader(s))
-                                {
-                                    CurrentCompnent.Sacss += sr.ReadToEnd();
-                                }
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine("Compnent Incomplete!");
-                        }
+                        CombineJsonAndWxss(SrcComBasePath);
                     }
                 }
             }
@@ -389,10 +310,231 @@ namespace ShiyiAsm
             code = RecoveryMoustache(code);
             code = BindTwoWay(filepath, code);
             code = SpecialCharRecovery(code);
+            code = FixPrefix(code);
             if (IsRoot)
             {
                 ApplyToPreProcess();
                 CurrentCompnent = new PesudoCompnent();
+            }
+            return code;
+        }
+
+        private static HtmlDocument RemoveNoUsedSlots(HtmlDocument SrcCodeXml)
+        {
+            HtmlNodeCollection NoUsedSlots = SrcCodeXml.DocumentNode.SelectNodes("//slot");
+            if (NoUsedSlots != null)
+            {
+                SrcCodeXml.DocumentNode.RemoveChildren(NoUsedSlots);
+            }
+            return SrcCodeXml;
+        }
+
+        private void AddComponentRenderSwich(HtmlNode Component, string ComponentId)
+        {
+            if (Component.Attributes["wx:if"] != null)
+            {
+                string guid = Component.Attributes["wx:if"].Value;
+                string wxif = Moustaches[guid]
+                    .Replace("}}", "&&" + ComponentId + "Visible}}");
+                Moustaches[guid] = wxif;
+            }
+            else
+            {
+                string guid = Guid.NewGuid().ToString();
+                Moustaches[guid] = "{{" + ComponentId + "Visible}}";
+                Component.SetAttributeValue("wx:if", guid);
+            }
+        }
+
+        private static string GetSrcBasePath()
+        {
+            string SrcFilePath = Assember.CurrentProcessFlow.SrcFilePath;
+            FileInfo SrcFileInfo = new FileInfo(SrcFilePath);
+            string SrcBasePath = SrcFilePath.Replace(SrcFileInfo.Extension, ".");
+            return SrcBasePath;
+        }
+
+        private static void ReadComponentJsonAndCss(string SrcBasePath)
+        {
+            CurrentCompnent.SrcSamlPath = SrcBasePath + "saml";
+            CurrentCompnent.SrcSajsonPath = SrcBasePath + "sajson";
+            CurrentCompnent.SrcSacssPath = SrcBasePath + "sacss";
+            if (File.Exists(SrcBasePath + "sajson"))
+            {
+                using (Stream s = File.OpenRead(SrcBasePath + "sajson"))
+                {
+                    using (StreamReader sr = new StreamReader(s))
+                    {
+                        CurrentCompnent.CombineSaJson(sr.ReadToEnd());
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine("Compnent Incomplete!");
+            }
+            if (File.Exists(SrcBasePath + "sacss"))
+            {
+                using (Stream s = File.OpenRead(SrcBasePath + "sacss"))
+                {
+                    using (StreamReader sr = new StreamReader(s))
+                    {
+                        CurrentCompnent.Sacss += "\n\r" + sr.ReadToEnd();
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine("Compnent Incomplete!");
+            }
+        }
+
+        private static void CombineJsonAndWxss(string SrcComBasePath)
+        {
+            if (File.Exists(SrcComBasePath + "cajson"))
+            {
+                using (Stream s = File.OpenRead(SrcComBasePath + "cajson"))
+                {
+                    using (StreamReader sr = new StreamReader(s))
+                    {
+                        CurrentCompnent.CombineSaJson(sr.ReadToEnd());
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine("Compnent Incomplete!");
+            }
+            if (File.Exists(SrcComBasePath + "cacss"))
+            {
+                using (Stream s = File.OpenRead(SrcComBasePath + "cacss"))
+                {
+                    using (StreamReader sr = new StreamReader(s))
+                    {
+                        CurrentCompnent.Sacss += sr.ReadToEnd();
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine("Compnent Incomplete!");
+            }
+        }
+
+        private void InsertWxml(HtmlDocument SrcCodeXml, HtmlNode Component, string ComponentId, string ComFile)
+        {
+            using (Stream s = File.OpenRead(ComFile))
+            {
+                using (StreamReader sr = new StreamReader(s))
+                {
+
+                    string CompCode = sr.ReadToEnd();
+                    HtmlDocument CompTemplete = new HtmlDocument();
+                    CompTemplete.LoadHtml(CompCode);
+                    HtmlNode CompTempleteNode = CompTemplete.DocumentNode;
+
+                    HtmlNodeCollection Slots = Component.SelectNodes("view[@slot]");
+                    if (Slots != null)
+                    {
+                        foreach (HtmlNode Slot in Slots)
+                        {
+                            string SlotName = Slot.Attributes["slot"] == null ? "" : Slot.Attributes["slot"].Value;
+                            if (SlotName == "")
+                            {
+                                SystemUtils.WriteError(string.Format("Slot Incomplete!\n{0}", Slot.OuterHtml));
+                                continue;
+                            }
+
+                            HtmlNode SlotTemplete = CompTemplete.DocumentNode.SelectSingleNode("//slot[@name='" + SlotName + "']");
+                            if (SlotTemplete != null)
+                            {
+                                Slot.Attributes.Remove(Slot.Attributes["slot"]);
+                                SlotTemplete.ParentNode.ReplaceChild(Slot, SlotTemplete);
+                            }
+                        }
+                        HtmlNodeCollection NoUsedSlots = CompTemplete.DocumentNode.SelectNodes("//slot");
+                        if (NoUsedSlots != null)
+                        {
+                            foreach(HtmlNode NoUsedSlot in NoUsedSlots)
+                            {
+                                NoUsedSlot.ParentNode.RemoveChild(NoUsedSlot);
+                            }
+                        }
+                    }
+
+
+
+                    CompCode = CombineSubComps(ComponentId, ComFile, CompTemplete);
+
+
+
+                    CompCode = SpecialCharProtect(CompCode);
+                    CompCode = ProtectMoustache(CompCode, ComponentId);
+                    HtmlNode CompElement = SrcCodeXml.CreateElement("view");
+                    foreach (HtmlAttribute attribute in Component.Attributes)
+                    {
+                        CompElement.SetAttributeValue(attribute.Name, attribute.Value);
+                    }
+                    CompElement.Attributes.Remove(CompElement.Attributes["using"]);
+                    CompElement.Attributes.Remove(CompElement.Attributes["id"]);
+                    CompElement.InnerHtml = CompCode;
+                    Component.ParentNode.ReplaceChild(CompElement, Component);
+                }
+            }
+        }
+
+        private string CombineSubComps(string ComponentId, string ComFile, HtmlDocument CompTemplete)
+        {
+            HtmlNodeCollection SubComps = CompTemplete.DocumentNode.SelectNodes("//component");
+            bool HasSubComp = false;
+            if (SubComps != null)
+            {
+                HasSubComp = true;
+
+                foreach (HtmlNode subComp in SubComps)
+                {
+                    try
+                    {
+                        subComp.SetAttributeValue("id", ComponentId + subComp.Attributes["id"].Value);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Compnent Incomplete!");
+                    }
+                }
+            }
+
+
+            string CompCode = CompTemplete.DocumentNode.OuterHtml;
+
+            if (HasSubComp)
+            {
+                string temp = CurrentCompId;
+                CurrentCompId = ComponentId;
+                CompCode = Process(CompCode, ComFile);
+                CurrentCompId = temp;
+            }
+
+            return CompCode;
+        }
+
+        private string FixPrefix(string code)
+        {
+            List<string> EmptyAttrs = new List<string>();
+            HtmlDocument SrcCodeXml = new HtmlDocument();
+            SrcCodeXml.LoadHtml(code);
+            HtmlNodeCollection PrefixAttrs = SrcCodeXml.DocumentNode.SelectNodes("//*[@*='']");
+            if(PrefixAttrs!= null)
+            {
+                foreach (HtmlNode node in PrefixAttrs)
+                {
+                    EmptyAttrs.AddRange(node.Attributes.Where(attr => attr.Value != null ? attr.Value == "" : true)
+                                                        .Select(attr => attr.Name));
+                }
+                foreach (string attr in EmptyAttrs)
+                {
+                    code = code.Replace(attr + "=\"\"", attr);
+                }
             }
             return code;
         }
